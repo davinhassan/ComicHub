@@ -1,0 +1,195 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+}
+
+:root {
+  color-scheme: light;
+  --background: #f8f7fc;
+  --foreground: #1c1730;
+  --primary: #6337b4;
+  --primary-foreground: #fff;
+  --muted: #ede8f6;
+  --muted-foreground: #514766;
+  --border: #d8cfe8;
+  --card: #fff;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #100e18;
+  --foreground: #f6f1ff;
+  --primary: #c4a2ff;
+  --primary-foreground: #211437;
+  --muted: #282036;
+  --muted-foreground: #c4bad2;
+  --border: #413651;
+  --card: #1a1525;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+button:not(:disabled) {
+  cursor: pointer;
+}
+.frame {
+  width: min(100% - 2rem, 70rem);
+  margin-inline: auto;
+}
+.site-header {
+  border-bottom: 1px solid var(--border);
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.5rem;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.main-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+.main-nav a {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.65rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+.main-nav a[aria-current="page"],
+.main-nav a:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.page-section {
+  padding-block: clamp(1.5rem, 5vw, 4rem);
+}
+.hero {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: clamp(1rem, 5vw, 4rem);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: linear-gradient(125deg, var(--card), var(--muted));
+}
+.hero h1 {
+  max-width: 15ch;
+  font-size: clamp(2rem, 7vw, 4.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  font-weight: 800;
+}
+.hero p {
+  margin-block: 1.25rem;
+  max-width: 40ch;
+  color: var(--muted-foreground);
+}
+.hero-icon {
+  display: grid;
+  place-items: center;
+  width: clamp(6rem, 20vw, 15rem);
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 2rem;
+  color: var(--primary);
+  transform: rotate(-8deg);
+}
+.hero-icon svg {
+  width: 58%;
+  height: 58%;
+  stroke-width: 1;
+}
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--border);
+  padding-block: 1rem;
+  color: var(--muted-foreground);
+}
+.site-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+}
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.75rem;
+  background: var(--card);
+  transform: translateY(-160%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (max-width: 719px) {
+  body {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+  .main-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.125rem;
+    padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom));
+    background: var(--card);
+    border-top: 1px solid var(--border);
+  }
+  .main-nav a {
+    flex-direction: column;
+    padding: 0.35rem 0.125rem;
+  }
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hero-icon {
+    display: none;
+  }
+}
+
+.catalog-field {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--background);
+  color: var(--foreground);
+}
