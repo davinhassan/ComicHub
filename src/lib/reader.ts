@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { ProviderError } from "./providers/errors.ts";
 import { getProvider } from "./providers/registry.ts";
-import { getKomikuReader } from "./providers/komiku.ts";
 import { getPepperCarrotReader } from "./providers/peppercarrot.ts";
-import { komikuChapterId } from "./komiku-paths.ts";
+import { getShinigamiReader } from "./providers/local-api-manga.ts";
 
 export const readerId = z.discriminatedUnion("provider", [
   z.object({ provider: z.literal("mangadex"), chapterId: z.uuid() }),
-  z.object({ provider: z.literal("komiku"), chapterId: komikuChapterId }),
+  z.object({ provider: z.literal("shinigami"), chapterId: z.uuid() }),
   z.object({
     provider: z.literal("peppercarrot"),
     chapterId: z.string().regex(/^[1-9]\d{0,2}$/),
@@ -21,10 +20,10 @@ export async function readerChapter(
 ) {
   const parsed = readerId.safeParse({ provider, chapterId });
   if (!parsed.success) throw new ProviderError("NOT_FOUND");
-  if (parsed.data.provider === "komiku")
-    return getKomikuReader(parsed.data.chapterId);
   if (parsed.data.provider === "peppercarrot")
     return getPepperCarrotReader(parsed.data.chapterId);
+  if (parsed.data.provider === "shinigami")
+    return getShinigamiReader(parsed.data.chapterId);
   return getProvider(parsed.data.provider).getReader(
     parsed.data.chapterId,
     quality,

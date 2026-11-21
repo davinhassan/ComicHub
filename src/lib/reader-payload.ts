@@ -5,9 +5,9 @@ export function readerPageUrl(provider: string) {
   return z.url({ protocol: /^https$/ }).refine((value) => {
     const url = new URL(value);
     if (url.username || url.password || url.port) return false;
-    if (provider === "komiku") {
+    if (provider === "shinigami") {
       return (
-        url.hostname === "img.komiku.org" &&
+        ["assets.shngm.id", "delivery.shngm.id"].includes(url.hostname) &&
         /\.(?:avif|gif|jpe?g|png|webp)$/i.test(url.pathname)
       );
     }
@@ -33,6 +33,8 @@ export function readerPageUrl(provider: string) {
 
 export function readerPayload(provider: string) {
   const pageUrl = readerPageUrl(provider);
+  const chapterId =
+    provider === "shinigami" ? z.uuid() : z.number().nonnegative();
 
   return z.object({
     title: z.string().optional(),
@@ -58,8 +60,8 @@ export function readerPayload(provider: string) {
       )
       .max(20)
       .optional(),
-    previous: z.number().nonnegative().optional(),
-    next: z.number().nonnegative().optional(),
+    previous: chapterId.optional(),
+    next: chapterId.optional(),
     pages: z
       .array(
         z.object({

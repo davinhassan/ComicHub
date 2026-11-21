@@ -11,8 +11,8 @@ import {
 } from "@/lib/catalog";
 import { mangaDexEnabled } from "@/lib/providers/registry";
 import { Button } from "@/components/ui/button";
-import { KomikuDetail } from "@/components/komiku-detail";
 import { PepperCarrotDetail } from "@/components/peppercarrot-detail";
+import { ShinigamiDetail } from "@/components/shinigami-detail";
 
 export const metadata = { title: "Detail komik" };
 const limit = 20;
@@ -36,8 +36,8 @@ export default async function Page({
   searchParams,
 }: PageProps<"/comic/[provider]/[id]">) {
   const { provider, id } = await params;
-  if (provider === "komiku") return <KomikuDetail id={id} />;
   if (provider === "peppercarrot") return <PepperCarrotDetail id={id} />;
+  if (provider === "shinigami") return <ShinigamiDetail id={id} />;
   if (provider !== "mangadex" || !z.uuid().safeParse(id).success) notFound();
   const path = `/comic/${provider}/${id}`;
   const parsed = detailQuery.safeParse(await searchParams);

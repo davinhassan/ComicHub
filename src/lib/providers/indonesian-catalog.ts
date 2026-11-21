@@ -1,8 +1,5 @@
-import { z } from "zod";
-import { fetchJson } from "./fetch-json.ts";
 import { ProviderError } from "./errors.ts";
-import { comicSlug, komikuChapterPath } from "../komiku-paths.ts";
-import { listKomiku } from "./komiku.ts";
+import { listShinigami, shinigamiEnabled } from "./local-api-manga.ts";
 import { getProvider, mangaDexEnabled } from "./registry.ts";
 import type { Genre } from "../genres.ts";
 import {
@@ -11,100 +8,20 @@ import {
   pepperCarrotTitle,
 } from "../peppercarrot-paths.ts";
 
-export const sources = [
-  pepperCarrotTitle,
-  "MangaDex",
-  "Komiku",
-  "Komikcast",
-] as const;
+const defaultSources = [pepperCarrotTitle, "MangaDex"] as const;
+const shinigami = "Shinigami";
+type Source = (typeof defaultSources)[number] | typeof shinigami;
+
+export function catalogSources(): readonly Source[] {
+  return shinigamiEnabled() ? [...defaultSources, shinigami] : defaultSources;
+}
 
 export interface CatalogCard {
   title: string;
-  source: (typeof sources)[number];
+  source: Source;
   href?: string;
   cover?: string;
   caption?: string;
-}
-
-const komikcastItem = z.object({
-  title: z.string().min(1),
-  slug: comicSlug,
-  cover: z.string().nullish(),
-  type: z.string().nullish(),
-  chapter: z.string().nullish(),
-  genres: z.array(z.object({ slug: z.string() })).default([]),
-});
-
-function allowedUrl(
-  value: string | null | undefined,
-  hosts: readonly string[],
-) {
-  if (!value || !URL.canParse(value)) return undefined;
-  const url = new URL(value);
-  if (
-    url.protocol === "https:" &&
-    !url.username &&
-    !url.password &&
-    !url.port &&
-    hosts.includes(url.hostname)
-  )
-    return url.href;
-}
-
-const options = { timeoutMs: 6500, userAgent: "ComicHub/0.1.0" };
-const komikcastBase = "https://s1.komikcast00.co.id";
-
-async function fromKomiku(
-  query: string,
-  genre?: Genre,
-): Promise<CatalogCard[]> {
-  const items = await listKomiku(query, genre);
-  return items.map((item) => ({
-    title: item.title,
-    source: "Komiku",
-    href:
-      !query && !genre && item.latest_chapter?.chapter_number != null
-        ? komikuChapterPath(item.slug, item.latest_chapter.chapter_number)
-        : `/comic/komiku/${item.slug}`,
-    cover: allowedUrl(item.poster, ["thumbnail.komiku.org"]),
-    caption: item.latest_chapter?.title || item.type || undefined,
-  }));
-}
-
-async function fromKomikcast(
-  query: string,
-  genre?: Genre,
-): Promise<CatalogCard[]> {
-  if (query === "." || query === "..") return [];
-  const endpoint = query
-    ? `search/${encodeURIComponent(query)}`
-    : genre
-      ? `genre/${genre}/1`
-      : "home";
-  const url = new URL(`/api/comic/komikcast/${endpoint}`, komikcastBase);
-  const items = z.array(komikcastItem).max(100);
-  const { data } = await fetchJson(
-    url,
-    z.object({
-      success: z.literal(true),
-      data:
-        query || genre
-          ? items
-          : z
-              .object({ latestUpdates: items })
-              .transform(({ latestUpdates }) => latestUpdates),
-    }),
-    options,
-  );
-  return data
-    .filter((item) => !genre || item.genres.some((tag) => tag.slug === genre))
-    .map((item) => ({
-      title: item.title,
-      source: "Komikcast",
-      href: `${komikcastBase}/detail-comic/${item.slug}`,
-      cover: allowedUrl(item.cover, ["direct-stor.berkasdrive.com"]),
-      caption: item.chapter || item.type || undefined,
-    }));
 }
 
 const comicTypes = { manga: "Manga", manhwa: "Manhwa", manhua: "Manhua" };
@@ -155,24 +72,27 @@ function fromPepperCarrot(query: string, genre?: Genre): CatalogCard[] {
 
 export async function loadIndonesianCatalog(
   query = "",
-  source?: (typeof sources)[number],
+  source?: Source,
   genre?: Genre,
 ) {
-  const selected = source ? [source] : sources;
+  const available = catalogSources();
+  const selected = source
+    ? available.filter((name) => name === source)
+    : available;
   return Promise.all(
     selected.map(async (name) => {
       try {
         if (name === pepperCarrotTitle) {
           return { name, items: fromPepperCarrot(query, genre), failed: false };
         }
-        if (name === "MangaDex" && !mangaDexEnabled()) {
+        if (name === shinigami) {
+          const items = await listShinigami(query, genre);
+          return { name, items, failed: false };
+        }
+        if (!mangaDexEnabled()) {
           return { name, items: [] as CatalogCard[], failed: false };
         }
-        const items = await (name === "MangaDex"
-          ? fromMangaDex(query, genre)
-          : name === "Komiku"
-            ? fromKomiku(query, genre)
-            : fromKomikcast(query, genre));
+        const items = await fromMangaDex(query, genre);
         return { name, items, failed: false };
       } catch (error) {
         if (!(error instanceof ProviderError)) throw error;

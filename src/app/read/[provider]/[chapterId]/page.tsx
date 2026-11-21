@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChapterReader } from "@/components/reader/chapter-reader";
 import { readerId } from "@/lib/reader";
+import { shinigamiEnabled } from "@/lib/providers/local-api-manga";
 import {
   pepperCarrotComicPath,
   pepperCarrotLicense,
@@ -18,24 +19,14 @@ export default async function ReaderPage({
   const parsed = readerId.safeParse(await params);
   if (!parsed.success) notFound();
   const { provider, chapterId } = parsed.data;
-  const comicSlug = provider === "komiku" ? chapterId.split("~")[0] : undefined;
-  const chapterPrefix = comicSlug
-    ? `/read/komiku/${comicSlug}~`
-    : provider === "peppercarrot"
-      ? "/read/peppercarrot/"
-      : undefined;
+  if (provider === "shinigami" && !shinigamiEnabled()) notFound();
+  const chapterPrefix =
+    provider === "mangadex" ? undefined : `/read/${provider}/`;
   return (
     <section className="page-section">
       <header className="mb-3">
         <h1 className="text-2xl font-bold">Baca chapter</h1>
-        {comicSlug ? (
-          <Link
-            className="mt-2 inline-block font-semibold text-primary underline"
-            href={`/comic/komiku/${comicSlug}`}
-          >
-            Daftar chapter Komiku
-          </Link>
-        ) : provider === "peppercarrot" ? (
+        {provider === "peppercarrot" ? (
           <div className="mt-2 space-y-2">
             <Link
               className="font-semibold text-primary underline"
@@ -50,6 +41,13 @@ export default async function ReaderPage({
               </a>
             </p>
           </div>
+        ) : provider === "shinigami" ? (
+          <Link
+            className="mt-2 inline-block font-semibold text-primary underline"
+            href="/explore?source=Shinigami"
+          >
+            Katalog Shinigami
+          </Link>
         ) : (
           <a
             className="mt-2 inline-block font-semibold text-primary underline"

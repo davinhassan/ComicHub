@@ -84,41 +84,19 @@ test("mode baca dan pemulihan gambar dengan fixture khusus browser", async ({
   );
 });
 
-test("reader Komiku tetap di ComicHub dan menavigasi chapter desimal", async ({
+test("tautan reader Komiku lama mengarah ke Jelajah", async ({
   page,
   request,
 }) => {
-  const path = "/read/komiku/comichub-test-fixture~1";
-  const endpoint = "/api/chapters/komiku/comichub-test-fixture~1";
-  const locked = await request.get(endpoint);
-  expect(locked.status()).toBe(403);
-  expect((await locked.json()).code).toBe("NO_LICENSE");
-  expect(
-    (
-      await request.get("/api/chapters/komiku/comichub-test-fixture~invalid")
-    ).status(),
-  ).toBe(404);
-
-  const url = "https://img.komiku.org/comichub-test-fixture/page-1.png";
-  const pages = [{ index: 0, url }];
-  const pixel = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf2sAAAAASUVORK5CYII=",
-    "base64",
+  await page.goto("/read/komiku/comichub-test-fixture~1");
+  await expect(page).toHaveURL(/\/explore$/);
+  await expect(page.getByLabel("Sumber").locator("option")).toHaveText([
+    "Semua sumber",
+    "Pepper & Carrot",
+    "MangaDex",
+  ]);
+  const chapter = await request.get(
+    "/api/chapters/komiku/comichub-test-fixture~1",
   );
-  await page.route(url, (route) =>
-    route.fulfill({ contentType: "image/png", body: pixel }),
-  );
-  await page.route(endpoint, (route) =>
-    route.fulfill({ json: { title: "Chapter 1", pages, next: 1.5 } }),
-  );
-  await page.route(`${endpoint}.5`, (route) =>
-    route.fulfill({ json: { title: "Chapter 1.5", pages, previous: 1 } }),
-  );
-  await page.goto(path);
-  await expect(page.getByRole("img", { name: "Halaman 1" })).toBeVisible();
-  await page.getByRole("link", { name: "Chapter berikutnya" }).click();
-  await expect(page).toHaveURL(`${path}.5`);
-  await expect(
-    page.getByRole("heading", { name: "Chapter 1.5" }),
-  ).toBeVisible();
+  expect(chapter.status()).toBe(404);
 });

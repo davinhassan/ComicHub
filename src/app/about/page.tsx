@@ -48,10 +48,6 @@ export default function Page() {
               </a>
               . Kredit lengkap tersedia di setiap episode.
             </li>
-            <li>
-              Katalog Komiku dan Komikcast menautkan ke situs sumber
-              masing-masing.
-            </li>
           </ul>
         </Card>
         <Card>

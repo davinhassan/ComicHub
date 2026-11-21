@@ -4,13 +4,11 @@ const config: NextConfig = {
   devIndicators: false,
   async redirects() {
     return [
-      {
-        source: "/explore/otakudesu",
-        destination: "/explore?source=Komiku",
-        permanent: false,
-      },
-      { source: "/explore/tenrai", destination: "/explore", permanent: false },
-    ];
+      "/explore/otakudesu",
+      "/explore/tenrai",
+      "/comic/komiku/:id",
+      "/read/komiku/:chapterId",
+    ].map((source) => ({ source, destination: "/explore", permanent: false }));
   },
 };
 

@@ -6,18 +6,24 @@ import { Button } from "@/components/ui/button";
 import { genres, type Genre } from "@/lib/genres";
 import {
   loadIndonesianCatalog,
-  sources,
+  catalogSources,
 } from "@/lib/providers/indonesian-catalog";
 
 export const metadata = { title: "Jelajah" };
-const filters = z.object({
-  q: z.string().trim().max(120).default(""),
-  source: z.union([z.literal(""), z.enum(sources)]).default(""),
-  genre: z.enum(["", ...(Object.keys(genres) as Genre[])]).default(""),
-});
 const label = "grid gap-1 text-sm font-semibold";
 
 export default async function Page({ searchParams }: PageProps<"/explore">) {
+  const sources = catalogSources();
+  const filters = z.object({
+    q: z.string().trim().max(120).default(""),
+    source: z
+      .union([
+        z.enum(["", ...sources]),
+        z.enum(["Komiku", "Komikcast"]).transform(() => "" as const),
+      ])
+      .default(""),
+    genre: z.enum(["", ...(Object.keys(genres) as Genre[])]).default(""),
+  });
   const parsed = filters.safeParse(await searchParams);
   const query = parsed.data?.q ?? "";
   const source = parsed.data?.source || undefined;
