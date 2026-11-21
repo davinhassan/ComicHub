@@ -3,13 +3,19 @@ import { readerChapter, readerErrors } from "@/lib/reader";
 import { ProviderError } from "@/lib/providers/errors";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext<"/api/chapters/[provider]/[id]">,
 ) {
   const { provider, id } = await context.params;
   const headers = new Headers({ "Cache-Control": "private, no-store" });
   try {
-    const chapter = await readerChapter(provider, id);
+    const chapter = await readerChapter(
+      provider,
+      id,
+      new URL(request.url).searchParams.get("quality") === "data-saver"
+        ? "data-saver"
+        : "original",
+    );
     if (!chapter.pages.length) throw new ProviderError("UNAVAILABLE");
     const payload = readerPayload(provider).safeParse(chapter);
     if (!payload.success) throw new ProviderError("INVALID_RESPONSE");

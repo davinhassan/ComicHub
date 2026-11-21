@@ -52,7 +52,6 @@ test("mode baca dan pemulihan gambar dengan fixture khusus browser", async ({
   );
   await page.route(pages[1].url, (route) => route.abort());
   await page.goto(path);
-  await expect(page.getByLabel("Mode baca")).toHaveValue("strip");
   await expect(page.getByRole("link", { name: "Grup Uji" })).toHaveAttribute(
     "href",
     group,
@@ -61,17 +60,25 @@ test("mode baca dan pemulihan gambar dengan fixture khusus browser", async ({
     page.getByRole("link", { name: "MangaDex", exact: true }).first(),
   ).toHaveAttribute("href", "https://mangadex.org");
   await expect(page.getByRole("img", { name: "Halaman 1" })).toBeVisible();
+  const settings = page.getByRole("button", { name: "Pengaturan" });
+  await settings.click();
+  await expect(settings).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByLabel("Mode baca")).toHaveValue("strip");
   await page.getByLabel("Mode baca").selectOption("paged");
   await expect(page.getByText("Halaman 1 / 2")).toBeVisible();
-  await page.getByRole("button", { name: "Lebar penuh" }).click();
-  await expect(
-    page.getByRole("button", { name: "Lebar penuh" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Lebar penuh" }).press("ArrowRight");
+  await page.getByLabel("Lebar halaman").selectOption("full");
+  await page.getByRole("button", { name: "Berikutnya" }).press("ArrowRight");
   await expect(page.getByText("Halaman 2 / 2")).toBeVisible();
   await expect(page.getByText("Halaman 2 gagal dimuat.")).toBeVisible();
   await page.getByRole("button", { name: "Muat ulang chapter" }).click();
-  await expect(page.getByLabel("Mode baca")).toHaveValue("strip");
+  // Reader settings persist across reloads of the chapter.
+  await expect(page.getByText("Halaman 1 / 2")).toBeVisible();
+  await page.getByRole("button", { name: "Pengaturan" }).click();
+  await expect(page.getByLabel("Mode baca")).toHaveValue("paged");
+  await expect(page.getByLabel("Lebar halaman")).toHaveValue("full");
+  await page.goto("/settings");
+  await expect(page.getByLabel("Mode baca")).toHaveValue("paged");
+  await page.goto(path);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     page.viewportSize()?.width,
   );
