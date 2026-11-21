@@ -14,19 +14,21 @@ export const readerId = z.discriminatedUnion("provider", [
   }),
 ]);
 
-export async function readerChapter(provider: string, chapterId: string) {
+export async function readerChapter(
+  provider: string,
+  chapterId: string,
+  quality: "original" | "data-saver" = "original",
+) {
   const parsed = readerId.safeParse({ provider, chapterId });
   if (!parsed.success) throw new ProviderError("NOT_FOUND");
   if (parsed.data.provider === "komiku")
     return getKomikuReader(parsed.data.chapterId);
   if (parsed.data.provider === "peppercarrot")
     return getPepperCarrotReader(parsed.data.chapterId);
-  return {
-    pages: await getProvider(parsed.data.provider).getReaderPages(
-      parsed.data.chapterId,
-      "original",
-    ),
-  };
+  return getProvider(parsed.data.provider).getReader(
+    parsed.data.chapterId,
+    quality,
+  );
 }
 
 export const readerErrors = {

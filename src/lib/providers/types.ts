@@ -1,4 +1,4 @@
-﻿export type ComicType = "manga" | "manhwa" | "manhua" | "other";
+export type ComicType = "manga" | "manhwa" | "manhua" | "other";
 export type ContentRating = "safe" | "suggestive" | "mature" | "unknown";
 
 export interface ComicSummary {
@@ -28,6 +28,8 @@ export interface ComicChapter {
   number?: string;
   language: string;
   publishedAt?: string;
+  externalUrl?: string;
+  groups?: { name: string; url: string }[];
 }
 
 export interface ReaderPage {

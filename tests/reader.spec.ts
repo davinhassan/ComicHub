@@ -4,16 +4,19 @@ const chapterId = "86c80f2e-6696-4373-834c-a5c7c9ece0e7";
 const path = `/read/mangadex/${chapterId}`;
 const endpoint = `/api/chapters/mangadex/${chapterId}`;
 
-test("reader menampilkan status jujur bila chapter belum diizinkan", async ({
+test("reader menampilkan status jujur bila MangaDex dinonaktifkan", async ({
   page,
   request,
 }) => {
+  test.skip(
+    process.env.FEATURE_MANGADEX === "true",
+    "Dengan MangaDex aktif, permintaan ini memanggil API live.",
+  );
   const response = await request.get(endpoint);
-  const enabled = process.env.FEATURE_MANGADEX === "true";
-  expect(response.status()).toBe(enabled ? 403 : 503);
+  expect(response.status()).toBe(503);
   expect(response.headers()["cache-control"]).toContain("no-store");
   const error = await response.json();
-  expect(error.code).toBe(enabled ? "NO_LICENSE" : "UNAVAILABLE");
+  expect(error.code).toBe("UNAVAILABLE");
   await page.goto(path);
   await expect(page.getByRole("status")).toHaveText(error.message);
   await expect(
@@ -33,7 +36,13 @@ test("mode baca dan pemulihan gambar dengan fixture khusus browser", async ({
     height: 480,
     url: `https://uploads.mangadex.org/data/test-fixture/page-${index}.png`,
   }));
-  await page.route(endpoint, (route) => route.fulfill({ json: { pages } }));
+  const group =
+    "https://mangadex.org/group/a3c1c2a5-6a0e-4b0e-9d59-5b2f7f0f9f11";
+  await page.route(endpoint, (route) =>
+    route.fulfill({
+      json: { pages, credits: [{ name: "Grup Uji", url: group }] },
+    }),
+  );
   const pixel = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf2sAAAAASUVORK5CYII=",
     "base64",
@@ -43,19 +52,33 @@ test("mode baca dan pemulihan gambar dengan fixture khusus browser", async ({
   );
   await page.route(pages[1].url, (route) => route.abort());
   await page.goto(path);
-  await expect(page.getByLabel("Mode baca")).toHaveValue("strip");
+  await expect(page.getByRole("link", { name: "Grup Uji" })).toHaveAttribute(
+    "href",
+    group,
+  );
+  await expect(
+    page.getByRole("link", { name: "MangaDex", exact: true }).first(),
+  ).toHaveAttribute("href", "https://mangadex.org");
   await expect(page.getByRole("img", { name: "Halaman 1" })).toBeVisible();
+  const settings = page.getByRole("button", { name: "Pengaturan" });
+  await settings.click();
+  await expect(settings).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByLabel("Mode baca")).toHaveValue("strip");
   await page.getByLabel("Mode baca").selectOption("paged");
   await expect(page.getByText("Halaman 1 / 2")).toBeVisible();
-  await page.getByRole("button", { name: "Lebar penuh" }).click();
-  await expect(
-    page.getByRole("button", { name: "Lebar penuh" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Lebar penuh" }).press("ArrowRight");
+  await page.getByLabel("Lebar halaman").selectOption("full");
+  await page.getByRole("button", { name: "Berikutnya" }).press("ArrowRight");
   await expect(page.getByText("Halaman 2 / 2")).toBeVisible();
   await expect(page.getByText("Halaman 2 gagal dimuat.")).toBeVisible();
   await page.getByRole("button", { name: "Muat ulang chapter" }).click();
-  await expect(page.getByLabel("Mode baca")).toHaveValue("strip");
+  // Reader settings persist across reloads of the chapter.
+  await expect(page.getByText("Halaman 1 / 2")).toBeVisible();
+  await page.getByRole("button", { name: "Pengaturan" }).click();
+  await expect(page.getByLabel("Mode baca")).toHaveValue("paged");
+  await expect(page.getByLabel("Lebar halaman")).toHaveValue("full");
+  await page.goto("/settings");
+  await expect(page.getByLabel("Mode baca")).toHaveValue("paged");
+  await page.goto(path);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     page.viewportSize()?.width,
   );

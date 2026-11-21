@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { ProviderError } from "./errors.ts";
 import { fetchJson } from "./fetch-json.ts";
 import type {
@@ -6,6 +6,7 @@ import type {
   ComicSummary,
   ComicType,
   PageResult,
+  ReaderPage,
 } from "./types.ts";
 
 const idSchema = z.uuid();
@@ -63,8 +64,48 @@ const chapterSchema = z.object({
     chapter: z.string().nullable(),
     translatedLanguage: language,
     publishAt: z.iso.datetime({ offset: true }),
+    externalUrl: z.string().nullish(),
+  }),
+  relationships: z
+    .array(
+      z.object({
+        id: idSchema,
+        type: z.string(),
+        attributes: z
+          .object({
+            name: z.string().optional(),
+            contentRating: z.string().optional(),
+          })
+          .nullish(),
+      }),
+    )
+    .default([]),
+});
+const imageFile = z.string().regex(/^[\w-]+\.(?:avif|gif|jpe?g|png|webp)$/i);
+const atHomeSchema = z.object({
+  result: z.literal("ok"),
+  baseUrl: z.url({ protocol: /^https$/ }),
+  chapter: z.object({
+    hash: z.string().regex(/^[0-9a-f]+$/i),
+    data: z.array(imageFile).max(500),
+    dataSaver: z.array(imageFile).max(500),
   }),
 });
+
+type Chapter = z.infer<typeof chapterSchema>;
+
+function chapterTitle({ title, chapter }: Chapter["attributes"]) {
+  return title || (chapter ? `Chapter ${chapter}` : "Chapter");
+}
+
+// MangaDex requires crediting the scanlation groups of every readable chapter.
+function chapterGroups({ relationships }: Chapter) {
+  return relationships.flatMap(({ id, type, attributes }) =>
+    type === "scanlation_group" && attributes?.name
+      ? [{ id, name: attributes.name, url: `https://mangadex.org/group/${id}` }]
+      : [],
+  );
+}
 function collection<T>(item: z.ZodType<T>) {
   return z.object({
     result: z.literal("ok"),
@@ -148,10 +189,25 @@ function validate<T>(schema: z.ZodType<T>, input: unknown): T {
   return result.data;
 }
 
+export interface MangaDexReader {
+  title: string;
+  credits: { name: string; url: string }[];
+  pages: ReaderPage[];
+}
+
 export function createMangaDex(options: {
   timeoutMs: number;
   request?: typeof fetch;
-}): ComicProvider & { getGenres(): Promise<{ id: string; label: string }[]> } {
+  // Groups that asked for their work to be unavailable here.
+  blockedGroups?: string[];
+}): ComicProvider & {
+  getGenres(): Promise<{ id: string; label: string }[]>;
+  getReader(
+    id: string,
+    quality?: "original" | "data-saver",
+  ): Promise<MangaDexReader>;
+} {
+  const blockedGroups = options.blockedGroups ?? [];
   // Cache only validated metadata. Keep short-lived entries bounded per process.
   const cache = new Map<string, { value: unknown; expires: number }>();
   let activeRequests = 0;
@@ -173,7 +229,8 @@ export function createMangaDex(options: {
     activeRequests++;
     try {
       const value = await fetchJson(url, schema, {
-        ...options,
+        timeoutMs: options.timeoutMs,
+        request: options.request,
         userAgent: "ComicHub/0.1.0",
       });
       const oldest = cache.keys().next().value;
@@ -239,9 +296,52 @@ export function createMangaDex(options: {
     };
   }
 
+  async function getReader(
+    id: string,
+    quality: "original" | "data-saver" = "original",
+  ): Promise<MangaDexReader> {
+    validate(idSchema, id);
+    const params = new URLSearchParams();
+    for (const include of ["scanlation_group", "manga"])
+      params.append("includes[]", include);
+    const { data } = await read(
+      `/chapter/${id}`,
+      z.object({ result: z.literal("ok"), data: chapterSchema }),
+      params,
+    );
+    const manga = data.relationships.find(({ type }) => type === "manga");
+    if (manga?.attributes?.contentRating !== "safe")
+      throw new ProviderError("FORBIDDEN");
+    const groups = chapterGroups(data);
+    if (
+      data.attributes.externalUrl ||
+      groups.some((group) => blockedGroups.includes(group.id))
+    )
+      throw new ProviderError("NO_LICENSE");
+
+    const { baseUrl, chapter } = await read(
+      `/at-home/server/${id}`,
+      atHomeSchema,
+      new URLSearchParams({ forcePort443: "true" }),
+    );
+    const [folder, files] =
+      quality === "original"
+        ? ["data", chapter.data]
+        : ["data-saver", chapter.dataSaver];
+    return {
+      title: chapterTitle(data.attributes),
+      credits: groups.map(({ name, url }) => ({ name, url })),
+      pages: files.map((file, index) => ({
+        index,
+        url: `${baseUrl.replace(/\/$/, "")}/${folder}/${chapter.hash}/${file}`,
+      })),
+    };
+  }
+
   return {
     id: "mangadex",
     displayName: "MangaDex",
+    getReader,
     search: (input) => list(input, "search"),
     latest: (input) => list(input, "latest"),
     getComic,
@@ -273,28 +373,31 @@ export function createMangaDex(options: {
         limit: String(limit),
         offset: String(cursor ?? 0),
         "order[chapter]": "desc",
+        "includes[]": "scanlation_group",
       });
       if (language) params.set("translatedLanguage[]", language);
+      for (const group of blockedGroups)
+        params.append("excludedGroups[]", group);
       return page(
         await read(`/manga/${id}/feed`, collection(chapterSchema), params),
         (chapter) => ({
           provider: "mangadex",
           id: chapter.id,
           comicId: id,
-          title:
-            chapter.attributes.title ||
-            (chapter.attributes.chapter
-              ? `Chapter ${chapter.attributes.chapter}`
-              : "Chapter"),
+          title: chapterTitle(chapter.attributes),
           number: chapter.attributes.chapter ?? undefined,
           language: chapter.attributes.translatedLanguage,
           publishedAt: chapter.attributes.publishAt,
+          externalUrl: chapter.attributes.externalUrl || undefined,
+          groups: chapterGroups(chapter).map(({ name, url }) => ({
+            name,
+            url,
+          })),
         }),
       );
     },
-    async getReaderPages(id) {
-      validate(idSchema, id);
-      throw new ProviderError("NO_LICENSE");
+    async getReaderPages(id, quality) {
+      return (await getReader(id, quality)).pages;
     },
   };
 }

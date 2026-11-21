@@ -15,7 +15,9 @@ export async function PepperCarrotDetail({ id }: { id: string }) {
   const result = await catalogResult(getPepperCarrotEpisodes);
   return (
     <article className="page-section">
-      <h1 className="mb-3 text-4xl font-bold">{pepperCarrotTitle}</h1>
+      <h1 className="mb-3 text-3xl font-bold tracking-tight">
+        {pepperCarrotTitle}
+      </h1>
       <p className="mb-3 text-muted-foreground">
         Fantasi · Komedi · Bahasa Indonesia
       </p>
@@ -38,13 +40,13 @@ export async function PepperCarrotDetail({ id }: { id: string }) {
       ) : !result.data.length ? (
         <CatalogFeedback state="empty" />
       ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {result.data.map(({ number, title }) => (
             <li key={number}>
               <Link
                 href={`/read/peppercarrot/${number}`}
                 prefetch={false}
-                className="block break-words p-3 font-semibold hover:bg-muted"
+                className="flex min-h-11 items-center break-words rounded-xl border border-border bg-card px-3 py-2 font-semibold hover:border-primary hover:text-primary"
               >
                 {title}
               </Link>

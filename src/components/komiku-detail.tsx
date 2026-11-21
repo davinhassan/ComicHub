@@ -29,7 +29,9 @@ export async function KomikuDetail({ id }: { id: string }) {
 
   return (
     <article className="page-section">
-      <h1 className="mb-3 break-words text-4xl font-bold">{title}</h1>
+      <h1 className="mb-3 break-words text-3xl font-bold tracking-tight text-balance">
+        {title}
+      </h1>
       <p className="mb-4">
         Sumber{" "}
         <a
@@ -46,13 +48,13 @@ export async function KomikuDetail({ id }: { id: string }) {
       )}
       <h2 className="mb-3 mt-8 text-2xl font-bold">Daftar chapter</h2>
       {chapterTitles.size ? (
-        <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {[...chapterTitles].map(([number, name]) => (
             <li key={number}>
               <Link
                 href={komikuChapterPath(id, number)}
                 prefetch={false}
-                className="block break-words p-3 font-semibold hover:bg-muted"
+                className="flex min-h-11 items-center break-words rounded-xl border border-border bg-card px-3 py-2 font-semibold hover:border-primary hover:text-primary"
               >
                 {name}
               </Link>

@@ -26,8 +26,8 @@ export default async function ReaderPage({
       : undefined;
   return (
     <section className="page-section">
-      <header className="mb-5">
-        <h1 className="text-3xl font-bold">Baca chapter</h1>
+      <header className="mb-3">
+        <h1 className="text-2xl font-bold">Baca chapter</h1>
         {comicSlug ? (
           <Link
             className="mt-2 inline-block font-semibold text-primary underline"

@@ -10,11 +10,6 @@ const config: NextConfig = {
         permanent: false,
       },
       { source: "/explore/tenrai", destination: "/explore", permanent: false },
-      {
-        source: "/comic/mangadex/:id",
-        destination: "/explore",
-        permanent: false,
-      },
     ];
   },
 };

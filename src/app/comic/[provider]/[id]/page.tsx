@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BookOpen } from "lucide-react";
 import { z } from "zod";
 import { CatalogFeedback, Pagination } from "@/components/catalog-results";
 import {
@@ -8,6 +9,7 @@ import {
   detailQuery,
   queryLink,
 } from "@/lib/catalog";
+import { mangaDexEnabled } from "@/lib/providers/registry";
 import { Button } from "@/components/ui/button";
 import { KomikuDetail } from "@/components/komiku-detail";
 import { PepperCarrotDetail } from "@/components/peppercarrot-detail";
@@ -19,8 +21,15 @@ const statuses = {
   completed: "Tamat",
   hiatus: "Jeda",
   cancelled: "Dibatalkan",
-  unknown: "Tidak diketahui",
+  unknown: "Status tidak diketahui",
 };
+const types = {
+  manga: "Manga",
+  manhwa: "Manhwa",
+  manhua: "Manhua",
+  other: "Komik",
+};
+const dateFormat = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" });
 
 export default async function Page({
   params,
@@ -32,7 +41,7 @@ export default async function Page({
   if (provider !== "mangadex" || !z.uuid().safeParse(id).success) notFound();
   const path = `/comic/${provider}/${id}`;
   const parsed = detailQuery.safeParse(await searchParams);
-  const enabled = process.env.FEATURE_MANGADEX === "true";
+  const enabled = mangaDexEnabled();
   const result = await catalogResult(
     () => catalogProvider().getComic(id),
     enabled,
@@ -64,69 +73,105 @@ export default async function Page({
       ...(parsed.data?.language ? [parsed.data.language] : []),
     ]),
   ].sort();
+  const latest =
+    chapters?.state === "ready"
+      ? chapters.data.items.find((chapter) => !chapter.externalUrl)
+      : undefined;
   return (
     <article className="page-section min-w-0">
-      <h1 className="mb-3 break-words text-4xl font-bold tracking-tight">
-        {comic.title}
-      </h1>
-      <p className="mb-4 text-muted-foreground">
-        {comic.status && statuses[comic.status]} · Rating aman ·{" "}
-        <a
-          className="font-semibold text-primary underline"
-          href={comic.sourceUrl}
-        >
-          MangaDex
-        </a>
-      </p>
-      {comic.alternativeTitles.length > 0 && (
-        <details className="mb-3 max-w-prose break-words text-muted-foreground">
-          <summary className="cursor-pointer font-semibold">
-            Judul alternatif
-          </summary>
-          <ul className="mt-2 list-inside list-disc">
-            {comic.alternativeTitles.map((title) => (
-              <li key={title}>{title}</li>
-            ))}
+      <header className="grid gap-5 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-8">
+        <div className="relative grid aspect-[3/4] w-36 place-items-center overflow-hidden rounded-xl border border-border bg-muted text-muted-foreground sm:w-full">
+          <BookOpen className="size-8" aria-hidden="true" />
+          {comic.coverUrl && (
+            // MangaDex covers are served through our cover proxy.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api${new URL(comic.coverUrl).pathname}`}
+              alt=""
+              decoding="async"
+              className="absolute inset-0 size-full object-cover"
+            />
+          )}
+        </div>
+        <div className="min-w-0">
+          <h1 className="mb-3 break-words text-3xl font-bold tracking-tight text-balance">
+            {comic.title}
+          </h1>
+          <ul className="mb-3 flex flex-wrap gap-2">
+            <li className="badge">{types[comic.type]}</li>
+            <li className="badge">{statuses[comic.status ?? "unknown"]}</li>
+            <li className="badge">Rating aman</li>
           </ul>
-        </details>
-      )}
-      {comic.authors.length > 0 && (
-        <p className="mb-3 break-words">{comic.authors.join(", ")}</p>
-      )}
-      <p className="max-w-prose whitespace-pre-line break-words text-muted-foreground">
-        {comic.description || "Sinopsis belum tersedia."}
-      </p>
-      {comic.tags.length > 0 && (
-        <ul className="mt-4 flex flex-wrap gap-2" aria-label="Tag">
-          {comic.tags.map((tag) => (
-            <li key={tag} className="rounded-lg bg-muted px-2 py-1 text-sm">
-              {tag}
-            </li>
-          ))}
-        </ul>
-      )}
-      <section className="mt-8" aria-labelledby="chapters">
-        <h2 id="chapters" className="mb-3 text-2xl font-bold">
-          Daftar chapter
-        </h2>
-        <form action={path} className="mb-4 flex flex-wrap items-end gap-3">
-          <label className="grid gap-1 font-semibold">
-            Bahasa chapter
-            <select
-              name="language"
-              className="catalog-field"
-              defaultValue={parsed.data?.language ?? ""}
-            >
-              <option value="">Semua</option>
-              {languages.map((lang) => (
-                <option key={lang} value={lang}>
-                  {lang === "id" ? "Indonesia" : lang}
-                </option>
+          {comic.authors.length > 0 && (
+            <p className="mb-3 break-words text-muted-foreground">
+              Oleh {comic.authors.join(", ")}
+            </p>
+          )}
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {latest && (
+              <Button asChild>
+                <Link href={`/read/${provider}/${latest.id}`} prefetch={false}>
+                  <BookOpen className="size-5" aria-hidden="true" />
+                  Baca chapter terbaru
+                </Link>
+              </Button>
+            )}
+            <a className="text-link" href={comic.sourceUrl}>
+              Lihat di MangaDex
+            </a>
+          </div>
+          <p className="max-w-prose whitespace-pre-line break-words text-muted-foreground">
+            {comic.description || "Sinopsis belum tersedia."}
+          </p>
+          {comic.tags.length > 0 && (
+            <ul className="mt-4 flex flex-wrap gap-2" aria-label="Tag">
+              {comic.tags.map((tag) => (
+                <li key={tag} className="badge">
+                  {tag}
+                </li>
               ))}
-            </select>
-          </label>
-          <Button type="submit">Terapkan</Button>
-        </form>
+            </ul>
+          )}
+          {comic.alternativeTitles.length > 0 && (
+            <details className="mt-4 max-w-prose break-words text-muted-foreground">
+              <summary className="cursor-pointer py-2 font-semibold">
+                Judul alternatif
+              </summary>
+              <ul className="list-inside list-disc">
+                {comic.alternativeTitles.map((title) => (
+                  <li key={title}>{title}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      </header>
+      <section className="mt-10" aria-labelledby="chapters">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <h2 id="chapters" className="text-2xl font-bold">
+            Daftar chapter
+          </h2>
+          <form action={path} className="flex items-end gap-2">
+            <label className="grid gap-1 text-sm font-semibold">
+              Bahasa chapter
+              <select
+                name="language"
+                className="catalog-field font-normal"
+                defaultValue={parsed.data?.language ?? ""}
+              >
+                <option value="">Semua</option>
+                {languages.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang === "id" ? "Indonesia" : lang}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button type="submit" variant="outline">
+              Terapkan
+            </Button>
+          </form>
+        </div>
         {!chapters ? (
           <CatalogFeedback state="invalid" />
         ) : chapters.state !== "ready" ? (
@@ -134,26 +179,55 @@ export default async function Page({
         ) : !chapters.data.items.length ? (
           <CatalogFeedback state="empty" />
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+          <ul className="grid gap-2 md:grid-cols-2">
             {chapters.data.items.map((chapter) => (
-              <li key={chapter.id}>
-                <a
-                  className="block break-words p-3 hover:bg-muted"
-                  href={`https://mangadex.org/chapter/${chapter.id}`}
-                >
-                  <span className="font-semibold">{chapter.title}</span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {chapter.language} · MangaDex
+              <li
+                key={chapter.id}
+                className="min-w-0 break-words rounded-xl border border-border bg-card p-3"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  {chapter.externalUrl ? (
+                    <span className="font-semibold">{chapter.title}</span>
+                  ) : (
+                    <Link
+                      className="font-semibold text-primary underline underline-offset-2"
+                      prefetch={false}
+                      href={`/read/${provider}/${chapter.id}`}
+                    >
+                      {chapter.title}
+                    </Link>
+                  )}
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {chapter.language.toUpperCase()}
+                    {chapter.publishedAt &&
+                      ` · ${dateFormat.format(new Date(chapter.publishedAt))}`}
                   </span>
-                </a>
-                <Link
-                  className="inline-block px-3 pb-3 text-sm font-semibold text-primary underline"
-                  prefetch={false}
-                  href={`/read/${provider}/${chapter.id}`}
-                  aria-label={`Buka reader ComicHub untuk ${chapter.title}`}
-                >
-                  Reader ComicHub
-                </Link>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {chapter.groups?.length ? (
+                    <>
+                      Diterjemahkan oleh{" "}
+                      {chapter.groups.map((group, index) => (
+                        <span key={group.url}>
+                          {index > 0 && ", "}
+                          <a className="underline" href={group.url}>
+                            {group.name}
+                          </a>
+                        </span>
+                      ))}{" "}
+                      ·{" "}
+                    </>
+                  ) : null}
+                  <a
+                    className="underline"
+                    href={`https://mangadex.org/chapter/${chapter.id}`}
+                    aria-label={`Buka ${chapter.title} di MangaDex`}
+                  >
+                    {chapter.externalUrl
+                      ? "Hanya tersedia di situs penerbit lewat MangaDex"
+                      : "Buka di MangaDex"}
+                  </a>
+                </p>
               </li>
             ))}
           </ul>

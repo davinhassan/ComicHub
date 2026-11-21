@@ -62,17 +62,14 @@ export function Pagination({
 }) {
   if (!previous && !next) return null;
   return (
-    <nav
-      className="mt-5 flex flex-wrap gap-4 font-semibold text-primary"
-      aria-label="Halaman hasil"
-    >
+    <nav className="mt-5 flex flex-wrap gap-x-6" aria-label="Halaman hasil">
       {previous && (
-        <Link href={previous} prefetch={false}>
+        <Link href={previous} prefetch={false} className="text-link">
           Sebelumnya
         </Link>
       )}
       {next && (
-        <Link href={next} prefetch={false}>
+        <Link href={next} prefetch={false} className="text-link">
           Berikutnya
         </Link>
       )}

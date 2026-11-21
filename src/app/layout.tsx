@@ -39,8 +39,11 @@ export default function RootLayout({
             {children}
           </main>
           <footer className="frame site-footer">
-            <span>ComicHub</span>
-            <Link href="/about">Tentang</Link>
+            <span>
+              ComicHub · Katalog MangaDex disediakan oleh{" "}
+              <a href="https://mangadex.org">MangaDex</a>
+            </span>
+            <Link href="/about">Tentang dan kredit</Link>
           </footer>
         </Theme>
       </body>

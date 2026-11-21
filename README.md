@@ -32,7 +32,13 @@ Jika Google Chrome sudah terpasang di Windows, jalankan `$env:COMICHUB_BROWSER_C
 
 Aktifkan `FEATURE_MANGADEX=true` melalui lingkungan proses atau `.env.local`. Jalankan `npm run check:mangadex` untuk memeriksa pencarian, detail, dan feed chapter berbahasa Indonesia. Validasi kontrak tanpa jaringan tersedia melalui `npm run test:providers`. Timeout default 8 detik dapat diatur lewat `UPSTREAM_TIMEOUT_MS`.
 
-Metadata MangaDex diuji melalui CLI. Pengiriman gambar chapter masih memerlukan izin konten. Kebijakan API mewajibkan atribusi MangaDex serta atribusi grup dan penanganan permintaan penghapusan apabila reader diaktifkan. Kebijakan tersebut juga membatasi penggunaan iklan dan layanan berbayar. [Kebijakan penggunaan API MangaDex](https://gitlab.com/mangadex-pub/mangadex-api-docs/-/blob/main/index.md)
+Dengan flag aktif, MangaDex muncul di Beranda dan Jelajah (judul yang punya terjemahan Indonesia, rating aman saja), dan chapter-nya dibaca di reader ComicHub.
+
+[Kebijakan penggunaan API MangaDex](https://gitlab.com/mangadex-pub/mangadex-api-docs/-/blob/main/index.md) mengizinkan pemakaian gratis dengan tiga syarat. ComicHub memenuhinya sebagai berikut.
+
+- **Kredit MangaDex.** Footer, halaman Tentang, kartu katalog, halaman detail, dan reader menyebut serta menautkan MangaDex.
+- **Kredit grup scanlation dan permintaan penghapusan.** Nama grup tampil di setiap chapter dan di reader. Untuk memenuhi permintaan penghapusan, tambahkan UUID grup ke `MANGADEX_BLOCKED_GROUPS` (pisahkan dengan koma) lalu mulai ulang server. Isi `CONTACT_EMAIL` agar halaman Tentang menampilkan alamat pengajuan.
+- **Tanpa iklan dan layanan berbayar.** Jangan menambahkan keduanya selama MangaDex dipakai.
 
 ## Katalog dan reader
 
@@ -54,4 +60,4 @@ npm.cmd test -- --workers=1
 
 Uji katalog live juga membuka Pepper & Carrot di reader dan memeriksa gambar dari situs resmi. Uji reader lainnya memakai gambar fixture untuk memeriksa tampilan halaman dan navigasi antar-chapter. `npm run test:providers` menjalankan uji kontrak provider tanpa jaringan.
 
-Reader MangaDex dapat dibuka melalui tautan **Reader ComicHub** pada daftar chapter. Penayangan gambar MangaDex masih memerlukan izin konten dan pemenuhan aturan pengiriman. [Panduan pengiriman gambar MangaDex@Home](https://gitlab.com/mangadex-pub/mangadex-api-docs/-/blob/main/04-chapter/retrieving-chapter.md)
+Reader MangaDex mengambil alamat gambar dari MangaDex@Home dan memuatnya langsung di browser. Hasil muat gambar dari node di luar `mangadex.org` dilaporkan ke MangaDex melalui `/api/reports/mangadex`. Chapter yang hanya tersedia di situs penerbit tidak dibuka di reader. Sampul MangaDex dimuat melalui `/api/covers`, karena MangaDex menolak hotlink dan mewajibkan situs pihak ketiga mem-proxy-nya. [Panduan pengiriman gambar MangaDex@Home](https://gitlab.com/mangadex-pub/mangadex-api-docs/-/blob/main/04-chapter/retrieving-chapter.md)

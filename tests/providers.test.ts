@@ -53,11 +53,99 @@ test("menormalisasi metadata, mengirim filter aman, dan memakai cache", async ()
   await assert.rejects(provider.search({ ...input, limit: 31 }), {
     code: "INVALID_INPUT",
   });
-  await assert.rejects(
-    provider.getReaderPages(fixture.data[0].id, "original"),
-    { code: "NO_LICENSE" },
-  );
   assert.equal(requests, 1);
+});
+
+const chapterId = "86c80f2e-6696-4373-834c-a5c7c9ece0e7";
+const groupId = "a3c1c2a5-6a0e-4b0e-9d59-5b2f7f0f9f11";
+function chapterFixture(contentRating = "safe") {
+  return {
+    result: "ok",
+    data: {
+      id: chapterId,
+      type: "chapter",
+      attributes: {
+        title: null,
+        chapter: "7",
+        translatedLanguage: "id",
+        publishAt: "2024-01-01T00:00:00+00:00",
+        externalUrl: null,
+      },
+      relationships: [
+        {
+          id: groupId,
+          type: "scanlation_group",
+          attributes: { name: "Grup Uji" },
+        },
+        {
+          id: fixture.data[0].id,
+          type: "manga",
+          attributes: { contentRating },
+        },
+      ],
+    },
+  };
+}
+const atHome = {
+  result: "ok",
+  baseUrl: "https://node.mangadex.network/token",
+  chapter: {
+    hash: "0123abcd",
+    data: ["1-aa.png", "2-bb.jpg"],
+    dataSaver: ["1-cc.jpg", "2-dd.jpg"],
+  },
+};
+function readerProvider(options: {
+  contentRating?: string;
+  blockedGroups?: string[];
+}) {
+  const urls: string[] = [];
+  const provider = createMangaDex({
+    timeoutMs: 1000,
+    blockedGroups: options.blockedGroups,
+    request: async (url) => {
+      urls.push(String(url));
+      return Response.json(
+        String(url).includes("/at-home/")
+          ? atHome
+          : chapterFixture(options.contentRating),
+      );
+    },
+  });
+  return { provider, urls };
+}
+
+test("reader menyusun halaman MangaDex@Home beserta kredit grup", async () => {
+  const { provider, urls } = readerProvider({});
+  const reader = await provider.getReader(chapterId);
+  assert.equal(reader.title, "Chapter 7");
+  assert.deepEqual(reader.credits, [
+    { name: "Grup Uji", url: `https://mangadex.org/group/${groupId}` },
+  ]);
+  assert.deepEqual(
+    reader.pages.map(({ url }) => url),
+    [
+      "https://node.mangadex.network/token/data/0123abcd/1-aa.png",
+      "https://node.mangadex.network/token/data/0123abcd/2-bb.jpg",
+    ],
+  );
+  assert.deepEqual(urls, [
+    `https://api.mangadex.org/chapter/${chapterId}?includes%5B%5D=scanlation_group&includes%5B%5D=manga`,
+    `https://api.mangadex.org/at-home/server/${chapterId}?forcePort443=true`,
+  ]);
+});
+
+test("reader menolak grup yang diblokir dan komik di luar rating aman", async () => {
+  const blocked = readerProvider({ blockedGroups: [groupId] });
+  await assert.rejects(blocked.provider.getReader(chapterId), {
+    code: "NO_LICENSE",
+  });
+  const mature = readerProvider({ contentRating: "erotica" });
+  await assert.rejects(mature.provider.getReader(chapterId), {
+    code: "FORBIDDEN",
+  });
+  // Neither case may ask MangaDex@Home for images.
+  assert.equal(blocked.urls.length + mature.urls.length, 2);
 });
 
 test("mematuhi Retry-After yang melebihi anggaran retry", async () => {
