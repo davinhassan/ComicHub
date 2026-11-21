@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { pepperCarrotOrigin } from "./peppercarrot-paths.ts";
 
-export function readerPayload(provider: string) {
-  const pageUrl = z.url({ protocol: /^https$/ }).refine((value) => {
+export function readerPageUrl(provider: string) {
+  return z.url({ protocol: /^https$/ }).refine((value) => {
     const url = new URL(value);
     if (url.username || url.password || url.port) return false;
     if (provider === "komiku") {
@@ -19,12 +19,20 @@ export function readerPayload(provider: string) {
         )
       );
     }
+    // MangaDex@Home may serve a chapter from any of its network nodes.
     return (
       provider === "mangadex" &&
-      url.hostname === "uploads.mangadex.org" &&
-      /^\/(data|data-saver)\//.test(url.pathname)
+      (url.hostname === "uploads.mangadex.org" ||
+        url.hostname.endsWith(".mangadex.network")) &&
+      /\/(?:data|data-saver)\/[\w-]+\/[\w-]+\.(?:avif|gif|jpe?g|png|webp)$/i.test(
+        url.pathname,
+      )
     );
   });
+}
+
+export function readerPayload(provider: string) {
+  const pageUrl = readerPageUrl(provider);
 
   return z.object({
     title: z.string().optional(),
@@ -38,6 +46,17 @@ export function readerPayload(provider: string) {
             new URL(value).pathname,
           ),
       )
+      .optional(),
+    credits: z
+      .array(
+        z.object({
+          name: z.string().min(1).max(200),
+          url: z
+            .url()
+            .refine((value) => value.startsWith("https://mangadex.org/group/")),
+        }),
+      )
+      .max(20)
       .optional(),
     previous: z.number().nonnegative().optional(),
     next: z.number().nonnegative().optional(),

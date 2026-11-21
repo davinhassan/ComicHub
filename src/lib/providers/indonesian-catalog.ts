@@ -3,6 +3,7 @@ import { fetchJson } from "./fetch-json.ts";
 import { ProviderError } from "./errors.ts";
 import { comicSlug, komikuChapterPath } from "../komiku-paths.ts";
 import { listKomiku } from "./komiku.ts";
+import { getProvider, mangaDexEnabled } from "./registry.ts";
 import type { Genre } from "../genres.ts";
 import {
   pepperCarrotComicPath,
@@ -10,7 +11,12 @@ import {
   pepperCarrotTitle,
 } from "../peppercarrot-paths.ts";
 
-export const sources = [pepperCarrotTitle, "Komiku", "Komikcast"] as const;
+export const sources = [
+  pepperCarrotTitle,
+  "MangaDex",
+  "Komiku",
+  "Komikcast",
+] as const;
 
 export interface CatalogCard {
   title: string;
@@ -101,6 +107,37 @@ async function fromKomikcast(
     }));
 }
 
+const comicTypes = { manga: "Manga", manhwa: "Manhwa", manhua: "Manhua" };
+
+async function fromMangaDex(
+  query: string,
+  genre?: Genre,
+): Promise<CatalogCard[]> {
+  const provider = getProvider("mangadex");
+  // MangaDex filters by tag id, so match its genre names to our slugs.
+  const tag = genre
+    ? (await provider.getGenres()).find(
+        ({ label }) => label.toLowerCase().replaceAll(" ", "-") === genre,
+      )
+    : undefined;
+  if (genre && !tag) return [];
+  const { items } = await provider.search({
+    query,
+    genre: tag?.id,
+    language: "id",
+    sort: query ? undefined : "latest",
+    limit: 24,
+  });
+  return items.map((item) => ({
+    title: item.title,
+    source: "MangaDex",
+    href: `/comic/mangadex/${item.id}?language=id`,
+    // MangaDex forbids hotlinking, so covers go through /api/covers.
+    cover: item.coverUrl && `/api${new URL(item.coverUrl).pathname}`,
+    caption: item.type === "other" ? undefined : comicTypes[item.type],
+  }));
+}
+
 function fromPepperCarrot(query: string, genre?: Genre): CatalogCard[] {
   const normalizedQuery = query.toLowerCase().replace(/\s*&\s*/g, " and ");
   if (!"pepper and carrot".includes(normalizedQuery)) return [];
@@ -128,9 +165,14 @@ export async function loadIndonesianCatalog(
         if (name === pepperCarrotTitle) {
           return { name, items: fromPepperCarrot(query, genre), failed: false };
         }
-        const items = await (name === "Komiku"
-          ? fromKomiku(query, genre)
-          : fromKomikcast(query, genre));
+        if (name === "MangaDex" && !mangaDexEnabled()) {
+          return { name, items: [] as CatalogCard[], failed: false };
+        }
+        const items = await (name === "MangaDex"
+          ? fromMangaDex(query, genre)
+          : name === "Komiku"
+            ? fromKomiku(query, genre)
+            : fromKomikcast(query, genre));
         return { name, items, failed: false };
       } catch (error) {
         if (!(error instanceof ProviderError)) throw error;

@@ -4,16 +4,19 @@ const chapterId = "86c80f2e-6696-4373-834c-a5c7c9ece0e7";
 const path = `/read/mangadex/${chapterId}`;
 const endpoint = `/api/chapters/mangadex/${chapterId}`;
 
-test("reader menampilkan status jujur bila chapter belum diizinkan", async ({
+test("reader menampilkan status jujur bila MangaDex dinonaktifkan", async ({
   page,
   request,
 }) => {
+  test.skip(
+    process.env.FEATURE_MANGADEX === "true",
+    "Dengan MangaDex aktif, permintaan ini memanggil API live.",
+  );
   const response = await request.get(endpoint);
-  const enabled = process.env.FEATURE_MANGADEX === "true";
-  expect(response.status()).toBe(enabled ? 403 : 503);
+  expect(response.status()).toBe(503);
   expect(response.headers()["cache-control"]).toContain("no-store");
   const error = await response.json();
-  expect(error.code).toBe(enabled ? "NO_LICENSE" : "UNAVAILABLE");
+  expect(error.code).toBe("UNAVAILABLE");
   await page.goto(path);
   await expect(page.getByRole("status")).toHaveText(error.message);
   await expect(
@@ -33,7 +36,13 @@ test("mode baca dan pemulihan gambar dengan fixture khusus browser", async ({
     height: 480,
     url: `https://uploads.mangadex.org/data/test-fixture/page-${index}.png`,
   }));
-  await page.route(endpoint, (route) => route.fulfill({ json: { pages } }));
+  const group =
+    "https://mangadex.org/group/a3c1c2a5-6a0e-4b0e-9d59-5b2f7f0f9f11";
+  await page.route(endpoint, (route) =>
+    route.fulfill({
+      json: { pages, credits: [{ name: "Grup Uji", url: group }] },
+    }),
+  );
   const pixel = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf2sAAAAASUVORK5CYII=",
     "base64",
@@ -44,6 +53,13 @@ test("mode baca dan pemulihan gambar dengan fixture khusus browser", async ({
   await page.route(pages[1].url, (route) => route.abort());
   await page.goto(path);
   await expect(page.getByLabel("Mode baca")).toHaveValue("strip");
+  await expect(page.getByRole("link", { name: "Grup Uji" })).toHaveAttribute(
+    "href",
+    group,
+  );
+  await expect(
+    page.getByRole("link", { name: "MangaDex", exact: true }).first(),
+  ).toHaveAttribute("href", "https://mangadex.org");
   await expect(page.getByRole("img", { name: "Halaman 1" })).toBeVisible();
   await page.getByLabel("Mode baca").selectOption("paged");
   await expect(page.getByText("Halaman 1 / 2")).toBeVisible();

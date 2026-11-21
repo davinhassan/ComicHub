@@ -21,12 +21,7 @@ export async function readerChapter(provider: string, chapterId: string) {
     return getKomikuReader(parsed.data.chapterId);
   if (parsed.data.provider === "peppercarrot")
     return getPepperCarrotReader(parsed.data.chapterId);
-  return {
-    pages: await getProvider(parsed.data.provider).getReaderPages(
-      parsed.data.chapterId,
-      "original",
-    ),
-  };
+  return getProvider(parsed.data.provider).getReader(parsed.data.chapterId);
 }
 
 export const readerErrors = {

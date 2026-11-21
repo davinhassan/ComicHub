@@ -12,6 +12,26 @@ const failure = z.object({ code: z.string(), message: z.string() });
 type Result =
   | z.infer<ReturnType<typeof readerPayload>>
   | { message: string; canRetry: boolean };
+// MangaDex asks clients to report how each image from a MangaDex@Home node
+// loaded. Images served by mangadex.org itself are exempt.
+function reportImage(provider: string, url: string, success: boolean) {
+  if (provider !== "mangadex" || new URL(url).hostname.endsWith("mangadex.org"))
+    return;
+  const timing = performance.getEntriesByName(url).at(-1) as
+    PerformanceResourceTiming | undefined;
+  void fetch("/api/reports/mangadex", {
+    method: "POST",
+    keepalive: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url,
+      success,
+      bytes: success ? (timing?.encodedBodySize ?? 0) : 0,
+      duration: Math.round(timing?.duration ?? 0),
+    }),
+  }).catch(() => undefined);
+}
+
 const genericFailure = {
   message: "Chapter gagal dimuat. Coba lagi.",
   canRetry: true,
@@ -99,7 +119,33 @@ export function ChapterReader({
           Sumber dan kredit episode
         </a>
       )}
-      <ReaderPages pages={result.pages} reload={retry} />
+      {provider === "mangadex" && (
+        <p className="mb-4 break-words text-muted-foreground">
+          {result.credits?.length ? (
+            <>
+              Diterjemahkan oleh{" "}
+              {result.credits.map((group, index) => (
+                <span key={group.url}>
+                  {index > 0 && ", "}
+                  <a className="text-primary underline" href={group.url}>
+                    {group.name}
+                  </a>
+                </span>
+              ))}{" "}
+              ·{" "}
+            </>
+          ) : null}
+          Disediakan oleh{" "}
+          <a className="text-primary underline" href="https://mangadex.org">
+            MangaDex
+          </a>
+        </p>
+      )}
+      <ReaderPages
+        pages={result.pages}
+        reload={retry}
+        report={(url, success) => reportImage(provider, url, success)}
+      />
       {chapterPrefix &&
         (result.previous !== undefined || result.next !== undefined) && (
           <nav
@@ -126,12 +172,16 @@ export function ChapterReader({
   );
 }
 
+type Report = (url: string, success: boolean) => void;
+
 function ReaderPages({
   pages,
   reload,
+  report,
 }: {
   pages: ReaderPage[];
   reload: () => void;
+  report: Report;
 }) {
   const [mode, setMode] = useState<"strip" | "paged">("strip");
   const [wide, setWide] = useState(false);
@@ -214,6 +264,7 @@ function ReaderPages({
             key={page.index}
             page={page}
             reload={reload}
+            report={report}
             eager={mode === "paged" || page.index === 0}
           />
         ))}
@@ -225,10 +276,12 @@ function ReaderPages({
 function ReaderImage({
   page,
   reload,
+  report,
   eager,
 }: {
   page: ReaderPage;
   reload: () => void;
+  report: Report;
   eager: boolean;
 }) {
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
@@ -254,8 +307,14 @@ function ReaderImage({
             decoding="async"
             referrerPolicy="no-referrer"
             className="h-auto w-full"
-            onLoad={() => setState("loaded")}
-            onError={() => setState("error")}
+            onLoad={() => {
+              setState("loaded");
+              report(page.url, true);
+            }}
+            onError={() => {
+              setState("error");
+              report(page.url, false);
+            }}
           />
         </div>
       )}

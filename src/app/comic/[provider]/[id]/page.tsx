@@ -8,6 +8,7 @@ import {
   detailQuery,
   queryLink,
 } from "@/lib/catalog";
+import { mangaDexEnabled } from "@/lib/providers/registry";
 import { Button } from "@/components/ui/button";
 import { KomikuDetail } from "@/components/komiku-detail";
 import { PepperCarrotDetail } from "@/components/peppercarrot-detail";
@@ -32,7 +33,7 @@ export default async function Page({
   if (provider !== "mangadex" || !z.uuid().safeParse(id).success) notFound();
   const path = `/comic/${provider}/${id}`;
   const parsed = detailQuery.safeParse(await searchParams);
-  const enabled = process.env.FEATURE_MANGADEX === "true";
+  const enabled = mangaDexEnabled();
   const result = await catalogResult(
     () => catalogProvider().getComic(id),
     enabled,
@@ -136,24 +137,46 @@ export default async function Page({
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-card">
             {chapters.data.items.map((chapter) => (
-              <li key={chapter.id}>
-                <a
-                  className="block break-words p-3 hover:bg-muted"
-                  href={`https://mangadex.org/chapter/${chapter.id}`}
-                >
+              <li key={chapter.id} className="break-words p-3">
+                {chapter.externalUrl ? (
                   <span className="font-semibold">{chapter.title}</span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {chapter.language} · MangaDex
-                  </span>
-                </a>
-                <Link
-                  className="inline-block px-3 pb-3 text-sm font-semibold text-primary underline"
-                  prefetch={false}
-                  href={`/read/${provider}/${chapter.id}`}
-                  aria-label={`Buka reader ComicHub untuk ${chapter.title}`}
-                >
-                  Reader ComicHub
-                </Link>
+                ) : (
+                  <Link
+                    className="font-semibold text-primary underline"
+                    prefetch={false}
+                    href={`/read/${provider}/${chapter.id}`}
+                  >
+                    {chapter.title}
+                  </Link>
+                )}
+                <span className="ml-2 text-sm text-muted-foreground">
+                  {chapter.language}
+                </span>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {chapter.groups?.length ? (
+                    <>
+                      Diterjemahkan oleh{" "}
+                      {chapter.groups.map((group, index) => (
+                        <span key={group.url}>
+                          {index > 0 && ", "}
+                          <a className="underline" href={group.url}>
+                            {group.name}
+                          </a>
+                        </span>
+                      ))}{" "}
+                      ·{" "}
+                    </>
+                  ) : null}
+                  <a
+                    className="underline"
+                    href={`https://mangadex.org/chapter/${chapter.id}`}
+                    aria-label={`Buka ${chapter.title} di MangaDex`}
+                  >
+                    {chapter.externalUrl
+                      ? "Hanya tersedia di situs penerbit lewat MangaDex"
+                      : "Buka di MangaDex"}
+                  </a>
+                </p>
               </li>
             ))}
           </ul>
